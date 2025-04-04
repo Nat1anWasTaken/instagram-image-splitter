@@ -31,7 +31,7 @@ def get_user_inputs() -> Tuple[str, int, int, str, str]:
         ),
         inquirer.List(
             "edge_mode",
-            message="請選擇邊緣處理模式",
+            message="請選擇安全線處理模式",
             choices=[
                 ("添加模糊邊緣", "blur"),
                 ("添加白色邊框", "pad"),
