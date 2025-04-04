@@ -18,7 +18,7 @@ git clone https://github.com/Nat1anWasTaken/instagram-image-splitter.git
 ### 2. 創建虛擬環境並安裝依賴
   ```bash
 uv venv
-uv install
+uv pip install .
 ```
 
 ### 3. 啟用虛擬環境
