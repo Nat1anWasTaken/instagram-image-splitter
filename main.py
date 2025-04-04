@@ -26,6 +26,7 @@ def get_user_inputs() -> Tuple[str, int, int, str]:
         inquirer.Path(
             "output_dir",
             message="請輸入輸出目錄的路徑",
+            default="split",
             path_type=inquirer.Path.DIRECTORY,
             exists=False,
         ),
