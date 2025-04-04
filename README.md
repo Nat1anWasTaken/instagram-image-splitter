@@ -2,6 +2,10 @@
 
 一個簡單的腳本，讓美宣不用為了裁切圖片哀號
 
+## 這能幹嘛？
+
+你給它一個大圖，然後它會幫你分成很多個小圖讓你可以一個個上傳上 Instagram
+
 ## 使用方法
 
 使用前，確保 [uv](https://github.com/astral-sh/uv) 和 [Python](https://www.python.org) 已經安裝在你的電腦上
