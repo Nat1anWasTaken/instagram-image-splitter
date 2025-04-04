@@ -146,7 +146,7 @@ def process_and_split_image(image_path, rows, cols, output_dir, edge_mode):
             processed_tile.save(tile_filename, quality=95)
             tile_number += 1
 
-    print(f"成功將圖片分割成 {rows * cols} 個區塊，並保存在 '{output_dir}' 目錄中。")
+    print(f"成功將圖片分割成 {rows * cols} 個區塊，並保存在 '{os.path.abspath(output_dir)}' 目錄中。")
 
 
 def main():
