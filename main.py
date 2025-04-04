@@ -2,10 +2,10 @@ import os
 from typing import Tuple
 
 import inquirer
-from PIL import Image, ImageOps
+from PIL import Image, ImageFilter, ImageOps
 
 
-def get_user_inputs() -> Tuple[str, int, int, str]:
+def get_user_inputs() -> Tuple[str, int, int, str, str]:
     questions = [
         inquirer.Path(
             "image_path",
@@ -29,6 +29,15 @@ def get_user_inputs() -> Tuple[str, int, int, str]:
             path_type=inquirer.Path.DIRECTORY,
             exists=False,
         ),
+        inquirer.List(
+            "edge_mode",
+            message="請選擇邊緣處理模式",
+            choices=[
+                ("添加模糊邊緣", "blur"),
+                ("添加白色邊框", "pad"),
+            ],
+            default="blur",
+        )
     ]
 
     answers = inquirer.prompt(questions)
@@ -44,10 +53,33 @@ def get_user_inputs() -> Tuple[str, int, int, str]:
         answers["rows"],
         answers["cols"],
         answers["output_dir"],
+        answers["edge_mode"],
     )
 
 
-def process_and_split_image(image_path, rows, cols, output_dir):
+def add_blur_safezones(tile, blur_width=32) -> Image.Image:
+    content_width, content_height = tile.size
+
+    # 左右切出各 32px
+    left_edge = tile.crop((0, 0, blur_width, content_height)).filter(
+        ImageFilter.GaussianBlur(radius=10)
+    )
+    right_edge = tile.crop(
+        (content_width - blur_width, 0, content_width, content_height)
+    ).filter(ImageFilter.GaussianBlur(radius=10))
+
+    # 建立最終圖片 1080 x 1350
+    final_img = Image.new("RGB", (content_width + 2 * blur_width, content_height))
+
+    # 拼接：左模糊 + 內容 + 右模糊
+    final_img.paste(left_edge, (0, 0))
+    final_img.paste(tile, (blur_width, 0))
+    final_img.paste(right_edge, (blur_width + content_width, 0))
+
+    return final_img
+
+
+def process_and_split_image(image_path, rows, cols, output_dir, edge_mode):
     img = Image.open(image_path)
     img_width, img_height = img.size
 
@@ -103,18 +135,23 @@ def process_and_split_image(image_path, rows, cols, output_dir):
 
             tile = img.crop((left, upper, right, lower))
 
-            tile_with_padding = ImageOps.expand(tile, (32, 0, 32, 0), fill="white")
+            if edge_mode == "pad":
+                processed_tile = ImageOps.expand(tile, (32, 0, 32, 0), fill="white")
+            elif edge_mode == "blur":
+                processed_tile = add_blur_safezones(tile)
+            else:
+                raise ValueError("Invalid edge mode selected.")
 
             tile_filename = os.path.join(output_dir, f"tile_{tile_number}.jpg")
-            tile_with_padding.save(tile_filename, quality=95)
+            processed_tile.save(tile_filename, quality=95)
             tile_number += 1
 
     print(f"成功將圖片分割成 {rows * cols} 個區塊，並保存在 '{output_dir}' 目錄中。")
 
 
 def main():
-    image_path, rows, cols, output_dir = get_user_inputs()
-    process_and_split_image(image_path, rows, cols, output_dir)
+    image_path, rows, cols, output_dir, edge_mode = get_user_inputs()
+    process_and_split_image(image_path, rows, cols, output_dir, edge_mode)
 
 
 if __name__ == "__main__":
