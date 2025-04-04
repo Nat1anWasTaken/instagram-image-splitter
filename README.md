@@ -4,7 +4,7 @@
 
 ## 使用方法
 
-使用前，確保 [uv] (https://github.com/astral-sh/uv) 和 [Python](https://www.python.org) 已經安裝在你的電腦上
+使用前，確保 [uv](https://github.com/astral-sh/uv) 和 [Python](https://www.python.org) 已經安裝在你的電腦上
 
 1. 複製這個 Repository
 ```bash
