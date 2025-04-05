@@ -60,18 +60,14 @@ def get_user_inputs() -> Tuple[str, int, int, str, str]:
 def add_blur_safezones(tile, blur_width=32) -> Image.Image:
     content_width, content_height = tile.size
 
-    # 左右切出各 32px
     left_edge = tile.crop((0, 0, blur_width, content_height)).filter(
         ImageFilter.GaussianBlur(radius=10)
     )
     right_edge = tile.crop(
         (content_width - blur_width, 0, content_width, content_height)
     ).filter(ImageFilter.GaussianBlur(radius=10))
-
-    # 建立最終圖片 1080 x 1350
     final_img = Image.new("RGB", (content_width + 2 * blur_width, content_height))
 
-    # 拼接：左模糊 + 內容 + 右模糊
     final_img.paste(left_edge, (0, 0))
     final_img.paste(tile, (blur_width, 0))
     final_img.paste(right_edge, (blur_width + content_width, 0))
