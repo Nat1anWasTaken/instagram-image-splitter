@@ -1,12 +1,12 @@
 import os
-from typing import Tuple, Dict, Any, List, cast, TypeVar
+import argparse
+from typing import Tuple, Dict, Any, List, cast, TypeVar, Optional
 
 import inquirer
 from PIL import Image, ImageFilter, ImageOps
 
-# 定義 inquirer 相關的類型
 T = TypeVar('T')
-InquirerQuestion = Any  # 由於 inquirer 沒有提供類型存根，我們使用 Any 作為臨時解決方案
+InquirerQuestion = Any
 
 def validate_digit(_: Any, x: Any) -> bool:
     return str(x).isdigit() and int(x) > 0
@@ -89,7 +89,9 @@ def process_and_split_image(
     rows: int, 
     cols: int, 
     output_dir: str, 
-    edge_mode: str
+    edge_mode: str,
+    resize_mode: str = "resize",
+    interactive: bool = True
 ) -> None:
     img = Image.open(image_path)
     img_width, img_height = img.size
@@ -101,21 +103,24 @@ def process_and_split_image(
     total_content_height = content_height * rows
 
     if img_width < total_content_width or img_height < total_content_height:
-        choices: List[Tuple[str, str]] = [
-            ("調整圖片大小以適應網格", "resize"),
-            ("添加黑色邊框以滿足所需尺寸", "pad"),
-        ]
-        action_question: List[InquirerQuestion] = [
-            inquirer.List(
-                "action",
-                message="原始圖片尺寸小於所需的網格尺寸。請選擇你希望的處理方式：",
-                choices=choices,
-            )
-        ]
-        action_result = inquirer.prompt(action_question)
-        if action_result is None:
-            raise ValueError("用戶取消了輸入")
-        action = cast(Dict[str, str], action_result)["action"]
+        if interactive:
+            choices: List[Tuple[str, str]] = [
+                ("調整圖片大小以適應網格", "resize"),
+                ("添加黑色邊框以滿足所需尺寸", "pad"),
+            ]
+            action_question: List[InquirerQuestion] = [
+                inquirer.List(
+                    "action",
+                    message="原始圖片尺寸小於所需的網格尺寸。請選擇你希望的處理方式：",
+                    choices=choices,
+                )
+            ]
+            action_result = inquirer.prompt(action_question)
+            if action_result is None:
+                raise ValueError("用戶取消了輸入")
+            action = cast(Dict[str, str], action_result)["action"]
+        else:
+            action = resize_mode
 
         if action == "resize":
             img = img.resize((total_content_width, total_content_height), Image.Resampling.LANCZOS)
@@ -167,9 +172,48 @@ def process_and_split_image(
     print(f"成功將圖片分割成 {rows * cols} 個區塊，並保存在 '{os.path.abspath(output_dir)}' 目錄中。")
 
 
+def parse_args() -> Optional[argparse.Namespace]:
+    parser = argparse.ArgumentParser(description='將圖片分割成多個小圖片，適合用於 Instagram 多圖發布')
+    parser.add_argument('-i', '--image', default='input.jpg', help='輸入圖片的路徑（默認：input.jpg）')
+    parser.add_argument('-r', '--rows', type=int, default=1, help='要分割的行數（默認：1）')
+    parser.add_argument('-c', '--cols', type=int, default=1, help='要分割的列數（默認：1）')
+    parser.add_argument('-o', '--output', default='./output', help='輸出目錄的路徑（默認：./output）')
+    parser.add_argument('-e', '--edge-mode', choices=['blur', 'pad'], default='blur',
+                      help='安全線處理模式：blur（模糊邊緣）或 pad（白色邊框）（默認：blur）')
+    parser.add_argument('-m', '--resize-mode', choices=['resize', 'pad'], default='resize',
+                      help='當圖片尺寸不足時的處理模式：resize（調整大小）或 pad（添加邊框）（默認：resize）')
+    parser.add_argument('--interactive', action='store_true', help='使用交互式界面')
+    
+    args = parser.parse_args()
+    
+    if args.interactive:
+        return args
+        
+    if not os.path.exists(args.image):
+        return None
+        
+    if not os.path.exists(args.output):
+        os.makedirs(args.output)
+        
+    return args
+
+
 def main() -> None:
-    image_path, rows, cols, output_dir, edge_mode = get_user_inputs()
-    process_and_split_image(image_path, rows, cols, output_dir, edge_mode)
+    args = parse_args()
+    
+    if args is None or args.interactive:
+        image_path, rows, cols, output_dir, edge_mode = get_user_inputs()
+        process_and_split_image(image_path, rows, cols, output_dir, edge_mode, interactive=True)
+    else:
+        process_and_split_image(
+            args.image, 
+            args.rows, 
+            args.cols, 
+            args.output, 
+            args.edge_mode, 
+            args.resize_mode,
+            interactive=False
+        )
 
 
 if __name__ == "__main__":
