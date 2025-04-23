@@ -139,6 +139,10 @@ def process_and_split_image(image_path, rows, cols, output_dir, edge_mode):
                 raise ValueError("Invalid edge mode selected.")
 
             tile_filename = os.path.join(output_dir, f"tile_{tile_number}.jpg")
+            
+            if processed_tile.mode == 'RGBA':
+                processed_tile = processed_tile.convert('RGB')
+                
             processed_tile.save(tile_filename, quality=95)
             tile_number += 1
 
