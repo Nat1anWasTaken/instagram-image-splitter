@@ -1,12 +1,18 @@
 import os
-from typing import Tuple
+from typing import Tuple, Dict, Any, List, cast, TypeVar
 
 import inquirer
 from PIL import Image, ImageFilter, ImageOps
 
+# 定義 inquirer 相關的類型
+T = TypeVar('T')
+InquirerQuestion = Any  # 由於 inquirer 沒有提供類型存根，我們使用 Any 作為臨時解決方案
+
+def validate_digit(_: Any, x: Any) -> bool:
+    return str(x).isdigit() and int(x) > 0
 
 def get_user_inputs() -> Tuple[str, int, int, str, str]:
-    questions = [
+    questions: List[InquirerQuestion] = [
         inquirer.Path(
             "image_path",
             message="請輸入圖片的路徑",
@@ -16,12 +22,12 @@ def get_user_inputs() -> Tuple[str, int, int, str, str]:
         inquirer.Text(
             "rows",
             message="請輸入要分割的行數",
-            validate=lambda _, x: x.isdigit() and int(x) > 0,
+            validate=validate_digit,
         ),
         inquirer.Text(
             "cols",
             message="請輸入要分割的列數",
-            validate=lambda _, x: x.isdigit() and int(x) > 0,
+            validate=validate_digit,
         ),
         inquirer.Path(
             "output_dir",
@@ -41,7 +47,10 @@ def get_user_inputs() -> Tuple[str, int, int, str, str]:
     ]
 
     answers = inquirer.prompt(questions)
+    if answers is None:
+        raise ValueError("用戶取消了輸入")
 
+    answers = cast(Dict[str, Any], answers)
     answers["rows"] = int(answers["rows"])
     answers["cols"] = int(answers["cols"])
 
@@ -57,7 +66,7 @@ def get_user_inputs() -> Tuple[str, int, int, str, str]:
     )
 
 
-def add_blur_safezones(tile, blur_width=32) -> Image.Image:
+def add_blur_safezones(tile: Image.Image, blur_width: int = 32) -> Image.Image:
     content_width, content_height = tile.size
 
     left_edge = tile.crop((0, 0, blur_width, content_height)).filter(
@@ -75,7 +84,13 @@ def add_blur_safezones(tile, blur_width=32) -> Image.Image:
     return final_img
 
 
-def process_and_split_image(image_path, rows, cols, output_dir, edge_mode):
+def process_and_split_image(
+    image_path: str, 
+    rows: int, 
+    cols: int, 
+    output_dir: str, 
+    edge_mode: str
+) -> None:
     img = Image.open(image_path)
     img_width, img_height = img.size
 
@@ -86,21 +101,24 @@ def process_and_split_image(image_path, rows, cols, output_dir, edge_mode):
     total_content_height = content_height * rows
 
     if img_width < total_content_width or img_height < total_content_height:
-        choices = [
+        choices: List[Tuple[str, str]] = [
             ("調整圖片大小以適應網格", "resize"),
             ("添加黑色邊框以滿足所需尺寸", "pad"),
         ]
-        action_question = [
+        action_question: List[InquirerQuestion] = [
             inquirer.List(
                 "action",
                 message="原始圖片尺寸小於所需的網格尺寸。請選擇你希望的處理方式：",
                 choices=choices,
             )
         ]
-        action = inquirer.prompt(action_question)["action"]
+        action_result = inquirer.prompt(action_question)
+        if action_result is None:
+            raise ValueError("用戶取消了輸入")
+        action = cast(Dict[str, str], action_result)["action"]
 
         if action == "resize":
-            img = img.resize((total_content_width, total_content_height), Image.LANCZOS)
+            img = img.resize((total_content_width, total_content_height), Image.Resampling.LANCZOS)
         elif action == "pad":
             pad_width = max(0, total_content_width - img_width)
             pad_height = max(0, total_content_height - img_height)
@@ -119,7 +137,7 @@ def process_and_split_image(image_path, rows, cols, output_dir, edge_mode):
         upper = (img_height - total_content_height) / 2
         right = left + total_content_width
         lower = upper + total_content_height
-        img = img.crop((left, upper, right, lower))
+        img = img.crop((int(left), int(upper), int(right), int(lower)))
 
     tile_number = 1
     for row in reversed(range(rows)):
@@ -129,7 +147,7 @@ def process_and_split_image(image_path, rows, cols, output_dir, edge_mode):
             right = left + content_width
             lower = upper + content_height
 
-            tile = img.crop((left, upper, right, lower))
+            tile = img.crop((int(left), int(upper), int(right), int(lower)))
 
             if edge_mode == "pad":
                 processed_tile = ImageOps.expand(tile, (32, 0, 32, 0), fill="white")
@@ -149,7 +167,7 @@ def process_and_split_image(image_path, rows, cols, output_dir, edge_mode):
     print(f"成功將圖片分割成 {rows * cols} 個區塊，並保存在 '{os.path.abspath(output_dir)}' 目錄中。")
 
 
-def main():
+def main() -> None:
     image_path, rows, cols, output_dir, edge_mode = get_user_inputs()
     process_and_split_image(image_path, rows, cols, output_dir, edge_mode)
 
